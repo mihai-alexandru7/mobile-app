@@ -1,0 +1,38 @@
+package com.florilegia.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+val ParchmentPage = Color(0xFFF1ECD0)
+val CreamPaper = Color(0xFFFFFDF5)
+val SandSection = Color(0xFFEFE7C2)
+val InkPrimary = Color(0xFF141F28)
+val OliveMuted = Color(0xFF5A5740)
+val BorderSubtle = Color(0xFFCFC495)
+val BorderMain = Color(0xFFB8AA72)
+val EspressoPrimary = Color(0xFF54420E)
+val EspressoDark = Color(0xFF3B2E09)
+val IvoryOnPrimary = Color(0xFFFFFDD0)
+val AgedBrass = Color(0xFF7D754B)
+val SoftGoldContainer = Color(0xFFF4EDC8)
+
+val NightBackground = Color(0xFF17140E)
+val NightSurface = Color(0xFF211D15)
+val NightSurfaceContainer = Color(0xFF2C261B)
+val NightPrimary = Color(0xFFE4CE8B)
+val NightOnPrimary = Color(0xFF352804)
+val NightPrimaryContainer = Color(0xFF4F3E0B)
+val NightOnPrimaryContainer = Color(0xFFFFECC0)
+val NightInk = Color(0xFFF3EDD6)
+val NightMuted = Color(0xFFC2B99D)
+val NightOutline = Color(0xFF5A5138)
+val NightDanger = Color(0xFFFFB4AB)
+val NightDangerBackground = Color(0xFF5C1510)
+
+val StatusSuccessBackground = Color(0xFFD3F0DC)
+val StatusSuccessText = Color(0xFF166034)
+val StatusWarningBackground = Color(0xFFFFF0B8)
+val StatusWarningText = Color(0xFF75550A)
+val StatusDangerBackground = Color(0xFFFFEBEB)
+val StatusDangerText = Color(0xFF9C1C15)
+val StatusNeutralBackground = Color(0xFFE3E6E9)
+val StatusNeutralText = Color(0xFF3F464D)
