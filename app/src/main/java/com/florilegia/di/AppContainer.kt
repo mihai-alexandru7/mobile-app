@@ -3,6 +3,7 @@ package com.florilegia.di
 import android.content.Context
 import com.florilegia.data.firebase.FirebaseProviders
 import com.florilegia.data.local.ReaderPreferencesStore
+import com.florilegia.data.repository.AdminRepository
 import com.florilegia.data.repository.AuthRepository
 
 class AppContainer(context: Context) {
@@ -14,6 +15,13 @@ class AppContainer(context: Context) {
 
     val authRepository: AuthRepository by lazy {
         AuthRepository(
+            auth = FirebaseProviders.auth,
+            db = FirebaseProviders.firestore,
+        )
+    }
+
+    val adminRepository: AdminRepository by lazy {
+        AdminRepository(
             auth = FirebaseProviders.auth,
             db = FirebaseProviders.firestore,
         )

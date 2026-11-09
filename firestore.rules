@@ -38,17 +38,38 @@ service cloud.firestore {
       return ts is timestamp && ts <= request.time;
     }
 
-    function isValidUser(data) {
+    function isValidUserCommon(data) {
       return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
              data.email is string && data.email.size() >= 3 && data.email.size() <= 255 &&
-             data.firstName is string && data.firstName.size() <= 100 &&
-             data.lastName is string && data.lastName.size() <= 100 &&
-             data.role in ['reader', 'publisher', 'administrator'] &&
              data.isActive is bool &&
-             (!('publisherName' in data) || data.publisherName == null || (data.publisherName is string && data.publisherName.size() <= 200)) &&
-             (!('publisherDescription' in data) || data.publisherDescription == null || (data.publisherDescription is string && data.publisherDescription.size() <= 1000)) &&
              isValidTimestamp(data.createdAt) &&
              isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidReader(data) {
+      return isValidUserCommon(data) &&
+             data.role == 'reader' &&
+             data.firstName is string && data.firstName.size() >= 1 && data.firstName.size() <= 100 &&
+             data.lastName is string && data.lastName.size() >= 1 && data.lastName.size() <= 100 &&
+             data.keys().hasOnly(['userId', 'email', 'role', 'isActive', 'firstName', 'lastName', 'createdAt', 'updatedAt']);
+    }
+
+    function isValidPublisher(data) {
+      return isValidUserCommon(data) &&
+             data.role == 'publisher' &&
+             data.publisherName is string && data.publisherName.size() >= 1 && data.publisherName.size() <= 200 &&
+             (!('publisherDescription' in data) || data.publisherDescription == null || (data.publisherDescription is string && data.publisherDescription.size() <= 1000)) &&
+             data.keys().hasOnly(['userId', 'email', 'role', 'isActive', 'publisherName', 'publisherDescription', 'createdAt', 'updatedAt']);
+    }
+
+    function isValidAdminUser(data) {
+      return isValidUserCommon(data) &&
+             data.role == 'administrator' &&
+             data.keys().hasOnly(['userId', 'email', 'role', 'isActive', 'createdAt', 'updatedAt']);
+    }
+
+    function isValidUser(data) {
+      return isValidReader(data) || isValidPublisher(data) || isValidAdminUser(data);
     }
 
     function isValidCartOrWishlistItem(data, bookId) {
@@ -175,16 +196,26 @@ service cloud.firestore {
       allow update: if isSignedIn() && isValidId(userId) &&
                        isValidUser(incoming()) &&
                        incoming().userId == existing().userId &&
+                       incoming().role == existing().role &&
                        incoming().createdAt == existing().createdAt && (
-                         (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['firstName', 'lastName', 'role', 'isActive', 'publisherName', 'publisherDescription', 'updatedAt'])) ||
+                         (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly([
+                           'isActive', 'firstName', 'lastName', 'publisherName', 'publisherDescription', 'updatedAt'
+                         ])) ||
                          (request.auth.uid == userId &&
                           existing().isActive == true &&
                           incoming().isActive == existing().isActive &&
-                          incoming().role == existing().role &&
-                          incoming().diff(existing()).affectedKeys().hasOnly(['firstName', 'lastName', 'publisherName', 'publisherDescription', 'updatedAt']))
+                          (
+                            (existing().role == 'reader' && incoming().diff(existing()).affectedKeys().hasOnly(['firstName', 'lastName', 'updatedAt'])) ||
+                            (existing().role == 'publisher' && incoming().diff(existing()).affectedKeys().hasOnly(['publisherName', 'publisherDescription', 'updatedAt']))
+                          ))
                        );
 
-      allow delete: if isAdmin() || (isSignedIn() && isValidId(userId) && request.auth.uid == userId);
+      allow delete: if isAdmin() || (
+                         isSignedIn() &&
+                         isValidId(userId) &&
+                         request.auth.uid == userId &&
+                         existing().isActive == true
+                       );
 
       match /cart/{bookId} {
         allow get, list: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;

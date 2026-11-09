@@ -40,15 +40,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.florilegia.FlorilegiaApplication
 import com.florilegia.data.model.User
 import com.florilegia.data.model.UserRole
 import com.florilegia.ui.screens.account.AccountScreen
+import com.florilegia.ui.screens.admin.AdminScreen
+import com.florilegia.ui.viewmodel.AdminViewModel
 
 private data class NavItem(
     val route: String,
@@ -71,15 +79,30 @@ fun MainWorkspace(
     onUpdatePublisherProfile: (String, String?) -> Unit,
     onSignOut: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val app = context.applicationContext as FlorilegiaApplication
     val snackbarHostState = remember { SnackbarHostState() }
     val navController = rememberNavController()
 
     val role = profile?.role ?: UserRole.READER
     val isAdmin = !isGuest && role == UserRole.ADMINISTRATOR
 
-    LaunchedEffect(authMessage) {
-        if (authMessage != null) {
-            snackbarHostState.showSnackbar(authMessage)
+    val adminViewModel: AdminViewModel? = if (isAdmin && profile != null) {
+        viewModel(
+            key = "admin_${profile.userId}",
+            factory = viewModelFactory {
+                initializer { AdminViewModel(app.container.adminRepository) }
+            }
+        )
+    } else null
+
+    val adminFeedback = adminViewModel?.feedback?.collectAsStateWithLifecycle()?.value
+
+    LaunchedEffect(authMessage, adminFeedback) {
+        val msg = adminFeedback ?: authMessage
+        if (msg != null) {
+            snackbarHostState.showSnackbar(msg)
+            adminViewModel?.clearFeedback()
             onClearAuthMessage()
         }
     }
@@ -162,11 +185,48 @@ fun MainWorkspace(
                     Text("Publisher Studio — Coming soon", style = MaterialTheme.typography.titleMedium)
                 }
             }
-            if (isAdmin) {
+            if (adminViewModel != null && profile != null) {
                 composable(Routes.ADMIN) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Admin Console — Coming soon", style = MaterialTheme.typography.titleMedium)
-                    }
+                    val books by adminViewModel.books.collectAsStateWithLifecycle()
+                    val pendingCount by adminViewModel.pendingBooksCount.collectAsStateWithLifecycle()
+                    val genres by adminViewModel.genres.collectAsStateWithLifecycle()
+                    val categories by adminViewModel.categories.collectAsStateWithLifecycle()
+                    val languages by adminViewModel.languages.collectAsStateWithLifecycle()
+                    val genreUsage by adminViewModel.genreUsageCounts.collectAsStateWithLifecycle()
+                    val categoryUsage by adminViewModel.categoryUsageCounts.collectAsStateWithLifecycle()
+                    val languageUsage by adminViewModel.languageUsageCounts.collectAsStateWithLifecycle()
+                    val users by adminViewModel.users.collectAsStateWithLifecycle()
+                    val reviews by adminViewModel.reviews.collectAsStateWithLifecycle()
+                    val adminBusy by adminViewModel.busy.collectAsStateWithLifecycle()
+
+                    AdminScreen(
+                        currentAdminUid = profile.userId,
+                        books = books,
+                        pendingBooksCount = pendingCount,
+                        genres = genres,
+                        categories = categories,
+                        languages = languages,
+                        genreUsageCounts = genreUsage,
+                        categoryUsageCounts = categoryUsage,
+                        languageUsageCounts = languageUsage,
+                        users = users,
+                        reviews = reviews,
+                        busy = adminBusy,
+                        onApproveBook = adminViewModel::approveBook,
+                        onRejectBook = adminViewModel::rejectBook,
+                        onWithdrawBook = adminViewModel::withdrawBook,
+                        onCreateGenre = adminViewModel::createGenre,
+                        onUpdateGenre = adminViewModel::updateGenre,
+                        onDeleteGenre = adminViewModel::deleteGenre,
+                        onCreateCategory = adminViewModel::createCategory,
+                        onUpdateCategory = adminViewModel::updateCategory,
+                        onDeleteCategory = adminViewModel::deleteCategory,
+                        onCreateLanguage = adminViewModel::createLanguage,
+                        onUpdateLanguage = adminViewModel::updateLanguage,
+                        onDeleteLanguage = adminViewModel::deleteLanguage,
+                        onToggleUserActive = adminViewModel::toggleUserActive,
+                        onDeleteReview = adminViewModel::deleteReview,
+                    )
                 }
             }
             composable(Routes.ACCOUNT) {
