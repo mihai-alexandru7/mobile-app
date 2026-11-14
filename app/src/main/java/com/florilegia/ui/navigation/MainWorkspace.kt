@@ -56,7 +56,9 @@ import com.florilegia.data.model.User
 import com.florilegia.data.model.UserRole
 import com.florilegia.ui.screens.account.AccountScreen
 import com.florilegia.ui.screens.admin.AdminScreen
+import com.florilegia.ui.screens.publisher.PublisherScreen
 import com.florilegia.ui.viewmodel.AdminViewModel
+import com.florilegia.ui.viewmodel.PublisherViewModel
 
 private data class NavItem(
     val route: String,
@@ -86,6 +88,7 @@ fun MainWorkspace(
 
     val role = profile?.role ?: UserRole.READER
     val isAdmin = !isGuest && role == UserRole.ADMINISTRATOR
+    val isPublisher = !isGuest && profile is User.Publisher
 
     val adminViewModel: AdminViewModel? = if (isAdmin && profile != null) {
         viewModel(
@@ -96,12 +99,28 @@ fun MainWorkspace(
         )
     } else null
 
-    val adminFeedback = adminViewModel?.feedback?.collectAsStateWithLifecycle()?.value
+    val publisherViewModel: PublisherViewModel? = if (isPublisher && profile != null) {
+        viewModel(
+            key = "publisher_${profile.userId}",
+            factory = viewModelFactory {
+                initializer {
+                    PublisherViewModel(
+                        publisherId = profile.userId,
+                        publisherRepository = app.container.publisherRepository,
+                    )
+                }
+            }
+        )
+    } else null
 
-    LaunchedEffect(authMessage, adminFeedback) {
-        val msg = adminFeedback ?: authMessage
+    val adminFeedback = adminViewModel?.feedback?.collectAsStateWithLifecycle()?.value
+    val publisherFeedback = publisherViewModel?.feedback?.collectAsStateWithLifecycle()?.value
+
+    LaunchedEffect(authMessage, adminFeedback, publisherFeedback) {
+        val msg = publisherFeedback ?: adminFeedback ?: authMessage
         if (msg != null) {
             snackbarHostState.showSnackbar(msg)
+            publisherViewModel?.clearFeedback()
             adminViewModel?.clearFeedback()
             onClearAuthMessage()
         }
@@ -173,6 +192,15 @@ fun MainWorkspace(
                             }
                         }
                     } else null,
+                    onOpenPublisher = if (isPublisher) {
+                        {
+                            navController.navigate(Routes.PUBLISHER) {
+                                popUpTo(Routes.BOOKSTORE) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    } else null,
                 )
             }
             composable(Routes.LIBRARY) {
@@ -180,9 +208,39 @@ fun MainWorkspace(
                     Text("Reader Library & Offline Downloads — Coming soon", style = MaterialTheme.typography.titleMedium)
                 }
             }
-            composable(Routes.PUBLISHER) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Publisher Studio — Coming soon", style = MaterialTheme.typography.titleMedium)
+            if (publisherViewModel != null && profile is User.Publisher) {
+                composable(Routes.PUBLISHER) {
+                    val books by publisherViewModel.books.collectAsStateWithLifecycle()
+                    val genres by publisherViewModel.genres.collectAsStateWithLifecycle()
+                    val categories by publisherViewModel.categories.collectAsStateWithLifecycle()
+                    val languages by publisherViewModel.languages.collectAsStateWithLifecycle()
+                    val salesReport by publisherViewModel.salesReport.collectAsStateWithLifecycle()
+                    val selectedRange by publisherViewModel.selectedTimeRange.collectAsStateWithLifecycle()
+                    val pubBusy by publisherViewModel.busy.collectAsStateWithLifecycle()
+                    val uploadState by publisherViewModel.uploadState.collectAsStateWithLifecycle()
+
+                    PublisherScreen(
+                        publisherName = profile.displayName,
+                        books = books,
+                        genres = genres,
+                        categories = categories,
+                        languages = languages,
+                        salesReport = salesReport,
+                        selectedTimeRange = selectedRange,
+                        busy = pubBusy,
+                        uploadState = uploadState,
+                        onSelectTimeRange = publisherViewModel::selectTimeRange,
+                        onSaveBook = { editingBook, submission, onComplete ->
+                            publisherViewModel.saveBook(
+                                publisherName = profile.displayName,
+                                editingBook = editingBook,
+                                submission = submission,
+                                onComplete = onComplete,
+                            )
+                        },
+                        onWithdrawBook = publisherViewModel::withdrawBook,
+                        onResubmitBook = publisherViewModel::resubmitBook,
+                    )
                 }
             }
             if (adminViewModel != null && profile != null) {
@@ -252,6 +310,7 @@ private fun StagePlaceholderStore(
     isGuest: Boolean,
     onOpenAuth: () -> Unit,
     onOpenAdmin: (() -> Unit)?,
+    onOpenPublisher: (() -> Unit)?,
 ) {
     Column(
         modifier = Modifier
@@ -285,13 +344,21 @@ private fun StagePlaceholderStore(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (onOpenAdmin != null) {
-                    Button(onClick = onOpenAdmin, modifier = Modifier.fillMaxWidth()) {
-                        Text("Open Admin Console")
+                when {
+                    onOpenAdmin != null -> {
+                        Button(onClick = onOpenAdmin, modifier = Modifier.fillMaxWidth()) {
+                            Text("Open Admin Console")
+                        }
                     }
-                } else if (isGuest) {
-                    OutlinedButton(onClick = onOpenAuth, modifier = Modifier.fillMaxWidth()) {
-                        Text("Sign In / Sign Up")
+                    onOpenPublisher != null -> {
+                        Button(onClick = onOpenPublisher, modifier = Modifier.fillMaxWidth()) {
+                            Text("Open Publisher Studio")
+                        }
+                    }
+                    isGuest -> {
+                        OutlinedButton(onClick = onOpenAuth, modifier = Modifier.fillMaxWidth()) {
+                            Text("Sign In / Sign Up")
+                        }
                     }
                 }
             }
